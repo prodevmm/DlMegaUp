@@ -1,0 +1,3 @@
+include ':app:dlmegaup'
+include ':app'
+rootProject.name = "BaseLibraryProject"
