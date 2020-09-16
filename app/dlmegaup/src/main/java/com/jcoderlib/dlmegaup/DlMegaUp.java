@@ -10,6 +10,21 @@ public class DlMegaUp {
         this.context = context;
     }
 
+    public DlMegaUp setForceTimeout(int miliseconds){
+        LimitProcess.TERMINATE_TIME = miliseconds;
+        return this;
+    }
+
+    public DlMegaUp setForceBoost(){
+        LimitProcess.speedBoost = true;
+        return this;
+    }
+
+    public DlMegaUp setForceBoost(int executeTimeMiliseconds){
+        LimitProcess.speedBoost = true;
+        LimitProcess.speedBoostJsExecutionTime = executeTimeMiliseconds;
+        return this;
+    }
 
     public void enqueue(String url, Callback callback) {
         LimitProcess limitProcess = new LimitProcess();

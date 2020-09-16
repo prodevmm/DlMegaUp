@@ -2,6 +2,7 @@ package com.jcoderlib.dlmegaup;
 
 import android.annotation.SuppressLint;
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.os.Handler;
 import android.util.Base64;
 import android.webkit.CookieManager;
@@ -18,7 +19,9 @@ public class LimitProcess {
     private OnTaskCompleted callback;
     private boolean downloadEventFired = false;
     private Handler handler;
-    public static int TERMINATE_TIME = 20000;
+    static int TERMINATE_TIME = 20000;
+    static boolean speedBoost;
+    static int speedBoostJsExecutionTime = 5000;
 
     private boolean clickUrlMethodInvoked;
     private static final String ERR_MSG_TIMEOUT = "api execution timeout";
@@ -35,8 +38,15 @@ public class LimitProcess {
         webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override
+            public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                super.onPageStarted(view, url, favicon);
+                if (speedBoost && !clickUrlMethodInvoked && !downloadEventFired)
+                    new Handler().postDelayed(() -> clickDlUrl(), speedBoostJsExecutionTime);
+            }
+
+            @Override
             public void onPageFinished(WebView view, String url) {
-                if (!clickUrlMethodInvoked && !downloadEventFired) clickDlUrl();
+                if (!speedBoost && !clickUrlMethodInvoked && !downloadEventFired) clickDlUrl();
             }
         });
 
