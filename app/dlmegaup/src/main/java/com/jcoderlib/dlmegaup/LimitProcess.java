@@ -3,9 +3,11 @@ package com.jcoderlib.dlmegaup;
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.os.Handler;
+import android.util.Base64;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
 import android.webkit.WebChromeClient;
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.FrameLayout;
@@ -14,38 +16,36 @@ import android.widget.LinearLayout;
 public class LimitProcess {
     private WebView webView;
     private OnTaskCompleted callback;
+    private boolean downloadEventFired = false;
     private Handler handler;
-    private boolean firstLoad = true;
+    public static int TERMINATE_TIME = 20000;
 
-    static int TERMINATE_TIME = 10000;
-    private static final String ERR_MSG_TIMEOUT = "connection timeout";
+    private boolean clickUrlMethodInvoked;
+    private static final String ERR_MSG_TIMEOUT = "api execution timeout";
 
     @SuppressLint({"SetJavaScriptEnabled"})
     public void startProcess(Context context, String url, final OnTaskCompleted callback) {
+
         this.callback = callback;
-
-
-
         webView = new WebView(context);
-        webView.getSettings().setJavaScriptEnabled(true);
-        webView.setWebChromeClient(new WebChromeClient());
+        WebSettings settings = webView.getSettings();
+        settings.setJavaScriptEnabled(true);
+        settings.setCacheMode(WebSettings.LOAD_NO_CACHE);
 
+        webView.setWebChromeClient(new WebChromeClient());
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                if (firstLoad) webView.loadUrl(url);
-                firstLoad = false;
+                if (!clickUrlMethodInvoked && !downloadEventFired) clickDlUrl();
             }
         });
 
+        LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT);
+        webView.setLayoutParams(params);
+
         webView.setDownloadListener(listener);
-
-        webView.setLayoutParams(new LinearLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT));
-
         webView.loadUrl(url);
+
         handler = new Handler();
         handler.postDelayed(processTerminator, TERMINATE_TIME);
     }
@@ -53,7 +53,6 @@ public class LimitProcess {
     private Runnable processTerminator = new Runnable() {
         @Override
         public void run() {
-            webView.removeJavascriptInterface("JusticeCoder");
             destroyWebView();
             callback.onTaskFailed(ERR_MSG_TIMEOUT);
         }
@@ -65,13 +64,34 @@ public class LimitProcess {
                                     String contentDisposition, String mimeType,
                                     long contentLength) {
             String cookies = CookieManager.getInstance().getCookie(url);
-
-            if (handler != null) handler.removeCallbacks(processTerminator);
-            callback.onTaskCompleted(url, cookies);
-
+            if (!downloadEventFired) {
+                downloadEventFired = true;
+                if (handler != null) handler.removeCallbacks(processTerminator);
+                callback.onTaskCompleted(url, cookies);
+            }
             destroyWebView();
         }
     };
+
+    private String decodeBase64(String coded) {
+        return new String(Base64.decode(coded, Base64.DEFAULT));
+    }
+
+    private void clickDlUrl() {
+        clickUrlMethodInvoked = true;
+        if (webView != null) {
+            String js = "javascript: (function() {" + decodeBase64(getJavascript()) + "})()";
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.KITKAT) {
+                webView.evaluateJavascript(js, null);
+            } else {
+                webView.loadUrl(js);
+            }
+        }
+    }
+
+    private String getJavascript() {
+        return "c2Vjb25kcyA9IDA7DWRpc3BsYXkoKTsNbGV0IGRsRWxlbWVudCA9IGRvY3VtZW50LmdldEVsZW1lbnRzQnlDbGFzc05hbWUoImJ0biBidG4tZGVmYXVsdCIpWzBdOw1kbEVsZW1lbnQuY2xpY2soKTs=";
+    }
 
     private void destroyWebView() {
         if (webView != null) {
@@ -82,7 +102,7 @@ public class LimitProcess {
     }
 
     public interface OnTaskCompleted {
-        void onTaskCompleted(String url, String cookie);
+        void onTaskCompleted(String url, String cookies);
 
         void onTaskFailed(String errorMessage);
     }
